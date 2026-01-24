@@ -5,6 +5,8 @@ volumes:
     driver: local
   kestra_data:
     driver: local
+  gcp_secrets:
+    driver: local
 
 services:
   pgdatabase:
@@ -52,7 +54,12 @@ services:
       - kestra_data:/app/storage
       - /var/run/docker.sock:/var/run/docker.sock
       - /tmp/kestra-wd:/tmp/kestra-wd
+      - $HOME/.config/gcloud/application_default_credentials.json:/secrets/adc.json:ro
+    env_file:
+      - .env
     environment:
+      GEMINI_API_KEY: ${GEMINI_API_KEY}
+      GOOGLE_APPLICATION_CREDENTIALS: /secrets/adc.json
       KESTRA_CONFIGURATION: |
         datasources:
           postgres:
@@ -73,6 +80,11 @@ services:
               basePath: "/app/storage"
           queue:
             type: postgres
+          ai:
+            type: "gemini"
+            gemini:
+              api-key: "${GEMINI_API_KEY}"
+              model-name: gemini-2.5-flash
           tasks:
             tmpDir:
               path: /tmp/kestra-wd/tmp
