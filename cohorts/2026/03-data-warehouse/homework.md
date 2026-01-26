@@ -21,26 +21,34 @@ Create an external table using the Yellow Taxi Trip Records. </br>
 Create a (regular/materialized) table in BQ using the Yellow Taxi Trip Records (do not partition or cluster this table). </br>
 </p>
 
+![table created]({186894EE-47A5-41FE-A249-9522AD1BBB54}.png)
+
 ## Question 1:
-What is count of records for the 2024 Yellow Taxi Data?
+What is count of records for the 2024 Yellow Taxi Data?</br> 
+![alt text]({6136C79D-43A6-49EE-B2A4-A54BF1A52455}.png)
 - 65,623
 - 840,402
-- 20,332,093
+- X 20,332,093
 - 85,431,289
 
 
 ## Question 2:
 Write a query to count the distinct number of PULocationIDs for the entire dataset on both the tables.</br> 
-What is the **estimated amount** of data that will be read when this query is executed on the External Table and the Table?
+What is the **estimated amount** of data that will be read when this query is executed on the External Table and the Table?</br> 
+![external]({50A12F80-20D8-4AD6-924F-6FDE5C6B6E9B}.png)
+![materialized]({65427A26-80BA-490B-995A-21156954E36C}.png)
 
 - 18.82 MB for the External Table and 47.60 MB for the Materialized Table
-- 0 MB for the External Table and 155.12 MB for the Materialized Table
+- X 0 MB for the External Table and 155.12 MB for the Materialized Table
 - 2.14 GB for the External Table and 0MB for the Materialized Table
 - 0 MB for the External Table and 0MB for the Materialized Table
 
 ## Question 3:
-Write a query to retrieve the PULocationID from the table (not the external table) in BigQuery. Now write a query to retrieve the PULocationID and DOLocationID on the same table. Why are the estimated number of Bytes different?
-- BigQuery is a columnar database, and it only scans the specific columns requested in the query. Querying two columns (PULocationID, DOLocationID) requires 
+Write a query to retrieve the PULocationID from the table (not the external table) in BigQuery. Now write a query to retrieve the PULocationID and DOLocationID on the same table.</br> 
+Why are the estimated number of Bytes different?</br> 
+![PULocationID]({D68CB994-D223-45DB-BDA4-1D8A36FFEDB6}.png)
+![PULocationID + DOLocationID]({B1E86643-D722-4010-8BEA-EF97DA25C32D}.png)
+- X BigQuery is a columnar database, and it only scans the specific columns requested in the query. Querying two columns (PULocationID, DOLocationID) requires 
 reading more data than querying one column (PULocationID), leading to a higher estimated number of bytes processed.
 - BigQuery duplicates data across multiple storage partitions, so selecting two columns instead of one requires scanning the table twice, 
 doubling the estimated bytes processed.
@@ -48,15 +56,17 @@ doubling the estimated bytes processed.
 - When selecting multiple columns, BigQuery performs an implicit join operation between them, increasing the estimated bytes processed
 
 ## Question 4:
-How many records have a fare_amount of 0?
+How many records have a fare_amount of 0?</br> 
+![fare_amount]({7AE0512A-3F96-478A-A2DF-169B00941708}.png)
 - 128,210
 - 546,578
 - 20,188,016
-- 8,333
+- X 8,333
 
 ## Question 5:
-What is the best strategy to make an optimized table in Big Query if your query will always filter based on tpep_dropoff_datetime and order the results by VendorID (Create a new table with this strategy)
-- Partition by tpep_dropoff_datetime and Cluster on VendorID
+What is the best strategy to make an optimized table in Big Query if your query will always filter based on tpep_dropoff_datetime and order the results by VendorID (Create a new table with this strategy)</br> 
+![partition + cluster]({3ABE73E4-5F01-4836-9CD5-9DFFC4D557F7}.png)
+- X Partition by tpep_dropoff_datetime and Cluster on VendorID
 - Cluster on by tpep_dropoff_datetime and Cluster on VendorID
 - Cluster on tpep_dropoff_datetime Partition by VendorID
 - Partition by tpep_dropoff_datetime and Partition by VendorID
@@ -69,9 +79,10 @@ Write a query to retrieve the distinct VendorIDs between tpep_dropoff_datetime
 Use the materialized table you created earlier in your from clause and note the estimated bytes. Now change the table in the from clause to the partitioned table you created for question 5 and note the estimated bytes processed. What are these values? </br>
 
 Choose the answer which most closely matches.</br> 
-
+![materialized]({A98B1D12-2266-4DB7-891B-66A1C9E7B819}.png)
+![partitioned + clustered]({08CAA6AC-206B-498A-A792-6F0EE0B03C52}.png)
 - 12.47 MB for non-partitioned table and 326.42 MB for the partitioned table
-- 310.24 MB for non-partitioned table and 26.84 MB for the partitioned table
+- X 310.24 MB for non-partitioned table and 26.84 MB for the partitioned table
 - 5.87 MB for non-partitioned table and 0 MB for the partitioned table
 - 310.31 MB for non-partitioned table and 285.64 MB for the partitioned table
 
@@ -81,18 +92,19 @@ Where is the data stored in the External Table you created?
 
 - Big Query
 - Container Registry
-- GCP Bucket
+- X GCP Bucket
 - Big Table
 
 ## Question 8:
 It is best practice in Big Query to always cluster your data:
 - True
-- False
-
+- X False
+If you always order your data in the same way, it can be considered good practice, but we don't necessarily query data the same way.
+Plus it's interesting if the column you want to cluster has a high cardinality (if low cardinality, prefer partitioning)
 
 ## (Bonus: Not worth points) Question 9:
 No Points: Write a `SELECT count(*)` query FROM the materialized table you created. How many bytes does it estimate will be read? Why?
-
+It reads no bytes because this information is already known since the table creation, it's just the number of the rows in the table and it's stored in the metadata of the table.
 
 ## Submitting the solutions
 
