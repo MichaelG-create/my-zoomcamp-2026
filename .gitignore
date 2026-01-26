@@ -1,0 +1,6 @@
+.vscode/settings.json
+*.env
+*.csv.gz
+*.parquet
+.python-version
+uv.lock
