@@ -11,18 +11,19 @@ import pyarrow.parquet as pq
 
 """
 Pre-reqs: 
-1. run `uv sync` from this 'extra' folder
-2. rename .env-example to .env (won't be commited thanks to .gitignore)
+1. run `uv sync` from this 'extra' folder (create venv and install dependencies from pyproject.toml)
+2. rename .env-example to .env (not commited thanks to .gitignore)
 3. in .env, 
     - set GCP_GCS_BUCKET as your bucket or change default value of BUCKET
-    - Set GOOGLE_APPLICATION_CREDENTIALS to your project/service-account key
+    - Set GOOGLE_APPLICATION_CREDENTIALS to your project/service-account json key 
+    (or don't set it if you use google ADC)
 """
-
+# load env vars from .env
 load_dotenv()
 
 # services = ['fhv','green','yellow']
 init_url = "https://github.com/DataTalksClub/nyc-tlc-data/releases/download/"
-# switch out the bucketname
+# if not done in .env, switch out the default bucketname
 BUCKET = os.environ.get("GCP_GCS_BUCKET", "dtc-data-lake-bucketname")
 
 
@@ -48,12 +49,75 @@ def download_with_progress(url: str, local_path: str, desc: str = "Downloading")
                 bar.update(size)
 
 
+def csv_to_parquet_with_progress(
+    csv_path: str, parquet_path: str, service_color: str, chunksize: int = 100_000
+):
+    # 1) Count rows (gzip-aware)
+    with gzip.open(csv_path, mode="rt") as f:
+        total_rows = sum(1 for _ in f) - 1  # minus header
+    if total_rows <= 0:
+        raise ValueError("CSV appears to be empty")
+
+    # 2) Read in chunks with fixed dtypes so parquet columns will directly have good types
+    # (as we did in module 1 in ingest.py script)
+    dtypes = {
+        "VendorID": "Int64",
+        "RatecodeID": "Int64",
+        "PULocationID": "Int64",
+        "DOLocationID": "Int64",
+        "passenger_count": "Int64",
+        "payment_type": "Int64",
+        "trip_type": "Int64",  # only in green but ignored if missing column
+        "store_and_fwd_flag": "string",
+        "trip_distance": "float64",
+        "fare_amount": "float64",
+        "extra": "float64",
+        "mta_tax": "float64",
+        "tip_amount": "float64",
+        "tolls_amount": "float64",
+        "ehailfee": "float64",  # only in green but ignored if missing column
+        "improvement_surcharge": "float64",
+        "total_amount": "float64",
+        "congestion_surcharge": "float64",
+    }
+
+    if service_color == "yellow":
+        parse_dates = ["tpep_pickup_datetime", "tpep_dropoff_datetime"]
+    else:
+        parse_dates = ["lpep_pickup_datetime", "lpep_dropoff_datetime"]
+
+    reader = pd.read_csv(
+        csv_path,
+        dtype=dtypes,
+        parse_dates=parse_dates,
+        compression="gzip",
+        chunksize=chunksize,
+        low_memory=False,
+    )
+
+    writer = None
+
+    with tqdm(total=total_rows, unit="rows", desc=f"Parquet {csv_path}") as bar:
+        for chunk in reader:
+            table = pa.Table.from_pandas(chunk)
+            if writer is None:
+                writer = pq.ParquetWriter(parquet_path, table.schema)
+            else:
+                # Optional safety: align to first schema
+                table = table.cast(writer.schema)
+            writer.write_table(table)
+            bar.update(len(chunk))
+
+    if writer is not None:
+        writer.close()
+
+
 def upload_to_gcs_with_progress(bucket: str, object_name: str, local_file: str):
     # # WORKAROUND to prevent timeout for files > 6 MB on 800 kbps upload speed.
     # # (Ref: https://github.com/googleapis/python-storage/issues/74)
     # Optional: tune chunk size (must be multiple of 256 KiB)
     storage.blob._MAX_MULTIPART_SIZE = 5 * 1024 * 1024  # 5 MB
-    storage.blob._DEFAULT_CHUNKSIZE = 5 * 1024 * 1024   # 5 MB
+    storage.blob._DEFAULT_CHUNKSIZE = 5 * 1024 * 1024  # 5 MB
 
     client = storage.Client()
     bucket_obj = client.bucket(bucket)
@@ -84,75 +148,6 @@ def upload_to_gcs_with_progress(bucket: str, object_name: str, local_file: str):
     print(f"Uploaded to GCS: gs://{bucket}/{object_name}")
 
 
-YELLOW_DTYPES = {
-    "VendorID": "Int64",
-    "passenger_count": "Int64",
-    "RatecodeID": "Int64",
-    "PULocationID": "Int64",
-    "DOLocationID": "Int64",
-    "payment_type": "Int64",
-    "store_and_fwd_flag": "string",
-}
-
-def csv_to_parquet_with_progress(csv_path: str, parquet_path: str, service_color: str, chunksize: int = 100_000):
-    # 1) Count rows (gzip-aware)
-    with gzip.open(csv_path, mode="rt") as f:
-        total_rows = sum(1 for _ in f) - 1  # minus header
-    if total_rows <= 0:
-        raise ValueError("CSV appears to be empty")
-
-    # 2) Read in chunks with fixed dtypes so parquet columns will directly have good types
-    # (as we did in module 1 in ingest.py script)
-    dtypes = {
-        "VendorID": "Int64",
-        "passenger_count": "Int64",
-        "trip_distance": "float64",
-        "RatecodeID": "Int64",
-        "store_and_fwd_flag": "string",
-        "PULocationID": "Int64",
-        "DOLocationID": "Int64",
-        "payment_type": "Int64",
-        "fare_amount": "float64",
-        "extra": "float64",
-        "mta_tax": "float64",
-        "tip_amount": "float64",
-        "tolls_amount": "float64",
-        "improvement_surcharge": "float64",
-        "total_amount": "float64",
-        "congestion_surcharge": "float64",
-    }
-
-    if service_color == 'yellow':
-        parse_dates = ["tpep_pickup_datetime", "tpep_dropoff_datetime"]
-    else:
-        parse_dates = ["lpep_pickup_datetime", "lpep_dropoff_datetime"]
-
-    reader = pd.read_csv(
-        csv_path,
-        dtype=dtypes,
-        parse_dates=parse_dates, 
-        compression="gzip",
-        chunksize=chunksize,
-        low_memory=False,
-    )
-
-    writer = None
-
-    with tqdm(total=total_rows, unit="rows", desc=f"Parquet {csv_path}") as bar:
-        for chunk in reader:
-            table = pa.Table.from_pandas(chunk)
-            if writer is None:
-                writer = pq.ParquetWriter(parquet_path, table.schema)
-            else:
-                # Optional safety: align to first schema
-                table = table.cast(writer.schema)
-            writer.write_table(table)
-            bar.update(len(chunk))
-
-    if writer is not None:
-        writer.close()
-
-
 def web_to_gcs(year, service):
     client = storage.Client()
     bucket_obj = client.bucket(BUCKET)
@@ -181,7 +176,9 @@ def web_to_gcs(year, service):
 
         # 3) Check if Parquet already exists locally
         if os.path.exists(parquet_file_name):
-            print(f"Parquet already exists locally, skipping conversion: {parquet_file_name}")
+            print(
+                f"Parquet already exists locally, skipping conversion: {parquet_file_name}"
+            )
         else:
             csv_to_parquet_with_progress(csv_file_name, parquet_file_name, service)
             print(f"Parquet: {parquet_file_name}")
@@ -189,9 +186,12 @@ def web_to_gcs(year, service):
         # 4) Upload with per-byte progress bar
         upload_to_gcs_with_progress(BUCKET, object_name, parquet_file_name)
 
-# web_to_gcs('2019', 'green')
-# web_to_gcs('2020', 'green')
-# web_to_gcs("2021", "green")
-web_to_gcs("2019", "yellow")
-web_to_gcs("2020", "yellow")
-web_to_gcs("2021", "yellow")
+
+web_to_gcs("2019", "green")
+web_to_gcs("2020", "green")
+web_to_gcs(
+    "2021", "green"
+)  # will fail when reaching 08 (normal, file does not exists in github :)
+# web_to_gcs("2019", "yellow")
+# web_to_gcs("2020", "yellow")
+# web_to_gcs("2021", "yellow") # will fail when reaching 08 (normal, file does not exists in github :)
