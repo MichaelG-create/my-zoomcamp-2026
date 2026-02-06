@@ -1,8 +1,8 @@
 ```sql
 CREATE OR REPLACE EXTERNAL TABLE `taxi-rides-ny.nytaxi.fhv_tripdata`
 OPTIONS (
-  format = 'CSV',
-  uris = ['gs://nyc-tl-data/trip data/fhv_tripdata_2019-*.csv']
+  format = 'PARQUET',
+  uris = ['gs://nyc-tl-data/trip data/fhv_tripdata_2019-*.parquet']
 );
 ```
 
