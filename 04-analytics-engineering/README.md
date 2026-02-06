@@ -40,7 +40,7 @@ Choose your setup path:
 ## Content
 
 ### Introduction to Analytics Engineering
-
+- Analytics Engineer interview </br>
 [![](https://markdown-videos-api.jorgenkh.no/youtube/HxMIsPrIyGQ)](https://youtu.be/HxMIsPrIyGQ)
 
 ### Introduction to data modeling
