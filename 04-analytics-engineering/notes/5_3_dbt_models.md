@@ -85,7 +85,7 @@ Regarding the **E-Hail Fee** column:
 The presenter decides to add a zero-value column for the e-hail fee in the yellow dataset to align schemas.
 
 [00:12:48]  
-After addressing column discrepancies, the presenter reruns the DBT models to update the data pipeline and reflect changes. The `dvt run` command is executed, successfully building the intermediate `trips_union` model that combines both green and yellow datasets with schema alignment. This unioned model forms a solid foundation for subsequent fact table construction.
+After addressing column discrepancies, the presenter reruns the DBT models to update the data pipeline and reflect changes. The `dbt run` command is executed, successfully building the intermediate `trips_union` model that combines both green and yellow datasets with schema alignment. This unioned model forms a solid foundation for subsequent fact table construction.
 
 ---
 
