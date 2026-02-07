@@ -1,0 +1,91 @@
+  - 4. 0. intro to data modeling (video watch)
+  - 4. 1. what is dbt
+  - 4. 2. differences between dbt core and dbt cloud
+  - cut readme in pieces and summarize each video whith AI to a mindmap
+  - 4. 3. Project setup (cloud)
+  - but first finish dbt BQ setup
+  - use setup video option A instead of text file
+  - redone full setup project (only dev env is ok in db cloud free tier, no prod allowed cause single connexion credentials allowed) (finaly prod also avalaible with same connection, has to be created after dev)
+  - dbt cloud CLI (followed dbt documentation) 
+    - (copy localy the dbt bin file to .local/bin/)
+    - copy the credentials in the good place
+  - installed dbt power user in vscode 
+    - at first did not recognized dbt cloud so had
+    - finally ok!
+  - checked a query to BQ dataset through dbt power user extension, using itself dbt cloud CLI, connected to the dbt project, connected to BQ 
+  - 4. 5. 1. dbt project structure explained
+  - 4. 5. 2. dbt sources (DE ZC 4.3.2. video)
+  - 4. 5. 3. dbt models
+    - what do I put in marts (dashboard to build?)
+    - put data in dimensions and facts (kimbal star schema data modeling) (dim_, fct_) (so normalize tables)
+    - will need to count rows for all trips so create a union in intermediate (not exposed to anyone) (need to handle the trip_type and ehail_fee cols only in green_tripdata)
+  - 4. 5. 4. dbt seeds and macros
+    - I want to know more about my data continuing to try to dim/fact all my columns
+    - I take a look at the IDs column: what do each number correspond to?
+    - VendorId only has 3 possible values (telecommunication companies)
+    - PULocationID: where? what does it correspond to? 
+    - look at the table taxi_zone_lookup.csv found on web, put it in seeds in case of need for reference
+    - run `dbt seed`: it let's this csv become an accessible model inside the project using the ref command (quick and dirty approach, goes to a repo, not suitable for big files, or done it for temporary files, before you upload it to your DWH)
+    - add dim_ files (write dim_zones using seed ref) (add dim_vendor)
+    - in dim_vendor, we want to harcode the text value corresponding to the number (info found on the internet) but not clean to do it directly in a model so USE A MACRO instead. (special {% macro macro_name(param) -%})  case when .... end {%- endmacro %}
+  - 09:02 doing homework : fct_trips.sql
+  - 10:23 restart working on module 4: dbt seeds and macros
+  - but first summarize past videos to keep track (and notes) of the course
+  - 10:52 back to writing fct_trip_data model in dbt
+  - 12:25 (still figuring out to write fct_ properly with perplexity guidance)
+  - 14:45 back on module 4 after muscu -> def of fct_trips
+  - 23:30 models running, sampling for dev (default) taget ok!
+  - 4. 5. 5. dbt documentation : (add schema.yml files in each stage of the models to describe the datas of each models)
+  - 4. 5. 6. dbt tests: data problems (2 causes: your code, the data themselves) -> need automated tests to detect
+    - singular tests (in test/assert_total_is_positive.sql 'select .... having ) fails if return 1 row at least
+    - source freshness (`dbt source freshness` (defined in sources.yml (only?) in models))
+    - generic tests: in sources: (4 types : 
+      - unique, 
+      - not known, 
+      - accepted values, 
+      - relationship (ensure FK exists in corresponding dim_ table))
+      - user defined (put them in `tests/generic/your_test.sql` ) (usefull for specific rules but look at packages before reinventing the wheel)
+    - unit test (v > 1.8)
+      - usefull for rollign windows, regexp complex 
+      - gives an input and the expected output 
+      - if the output is not the expected one: error
+    - model contracts
+      - in models yml: config: contract: enforced: true  (if one of the columns details specified in the yml are not respected, the test fails)
+    - more test in CI/CD pipelines
+    - REMEBER: 1 detect error ASAP, 2 find their origin to fix it
+  - 4. 5. 7. packages: large community (find them in dbt hub pakages, look at featured for quality packages, others be careful)
+    - dbt utils (most popular, many functionnalities) (official from dbt labs)
+    - dbt_project_evaluation: check if you use best practice
+    - codegen: generate base model source files (give the sql code, generate the yml (inverse possible too))
+    - audithelper (useful when refactoring, test if same number of columns and rows between previous and new models)
+    - packages specific for various DWH (Snowflake)
+    - dbt expectations: build tests for almost every possible thing to test (look here when need to write a test)
+    - install with `dbt deps`
+    - useful for cross DWH compatibility (e.g. generate_surrogate_key from dbt_utils, ensure compat because written in many SQL dialects by dbt_utils and translated by it, detecting which DWH we use)
+  - 4. 5. 8. dbt commands (recap)
+    - dbt init (in core only, not in cloud) (generate prject structure)
+    - dbt debug (check if profiles.yml / dbt_cloud.yml and dbt_project.yml are ok)
+    - dbt seed: ingest all csv from the seed folder
+    - dbt snapshot: create a snapshot
+    - dbt source freshness 
+    - dbt doc generates (json)
+    - dbt doc serve (browse localy the json) (only for core)
+    - dbt clean: cleans all targets specified in dbt_project.yml / clean-targets: - 'target', - 'packages' - etc. (so needs to be rebuild)
+    - dbt compile: takes all your dbt models, and under the target, places the codes with Jinjas replaced (detect errors before the build and free to run :)
+    - dbt run: takes everything in your project and materializes it.
+    - dbt test: checks all of the test in your dbt projects and runs them
+    - dbt build: (dbt run + dbt seed + dbt test + dbt snapshot in the right order ) SMART! 
+    - dbt retry: restarts from where it failed (after you corrected somthing :) 
+    - FLAGS: 
+      - dbt --help / -h: overview of the possibilities
+      - dbt --version / -v
+      - dbt run --full-refresh: in incremental models, instaed of adding incrementaling, drops everything and rebuild from the start (do it once a month)
+      - dbt run --fail-fast: stricter (fails on warning too)
+      - dbt run --target / -t: select a specific environnement (not available in dbt cloud)
+      - dbt run --select int_trips: runs the selected model and rebuild it (not rebuilding the upstream models)
+      - dbt run --select +int_trips: runs the selected model and rebuild it and upstream models
+      - dbt run --select int_trips+: runs the selected model and rebuild it and downstream models
+      - dbt run --select +int_trips+: rebuild up and downstream
+      - dbt run --select state:modified :rebuild what has been modified (in dbt cloud)
+      - dbt run --select state:modified --state: ./target :rebuild what has been modified (in core)
+  - Finished all dbt vids ! 2026-02-07 02:32
