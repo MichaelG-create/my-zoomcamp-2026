@@ -9,7 +9,7 @@ inputs:
   - id: taxi
     type: SELECT
     displayName: Select taxi type
-    values: [yellow, green]
+    values: [yellow, green, fhv]
     defaults: green
 
 variables:
@@ -231,6 +231,82 @@ tasks:
               S.payment_type, S.trip_type, S.congestion_surcharge
             );
 
+  - id: if_fhv_taxi
+    type: io.kestra.plugin.core.flow.If
+    condition: "{{inputs.taxi == 'fhv'}}"
+    then:
+      - id: bq_fhv_tripdata
+        type: io.kestra.plugin.gcp.bigquery.Query
+        sql: |
+          CREATE TABLE IF NOT EXISTS `{{kv('GCP_PROJECT_ID')}}.{{kv('GCP_DATASET')}}.fhv_tripdata`
+          (
+              unique_row_id BYTES,
+              filename STRING,
+
+              dispatching_base_num STRING,
+
+              pickup_datetime TIMESTAMP,
+              dropOff_datetime TIMESTAMP,
+
+              PUlocationID STRING,
+              DOlocationID STRING,
+
+              SR_Flag STRING,
+              Affiliated_base_number STRING             
+
+          )
+          PARTITION BY DATE(pickup_datetime);
+
+      - id: bq_fhv_table_ext
+        type: io.kestra.plugin.gcp.bigquery.Query
+        sql: |
+          CREATE OR REPLACE EXTERNAL TABLE `{{kv('GCP_PROJECT_ID')}}.{{render(vars.table)}}_ext`
+          OPTIONS (
+            format = 'PARQUET',
+            uris = ['{{render(vars.gcs_file)}}']
+          );
+
+      - id: bq_fhv_table_tmp
+        type: io.kestra.plugin.gcp.bigquery.Query
+        sql: |
+          CREATE OR REPLACE TABLE `{{kv('GCP_PROJECT_ID')}}.{{render(vars.table)}}` AS
+          SELECT
+            MD5(CONCAT(
+              COALESCE(CAST(dispatching_base_num AS STRING), ""),
+              COALESCE(CAST(pickup_datetime AS STRING), ""),
+              COALESCE(CAST(dropOff_datetime AS STRING), ""),
+              COALESCE(CAST(PUlocationID AS STRING), ""),
+              COALESCE(CAST(DOlocationID AS STRING), "")
+            )) AS unique_row_id,
+            "{{render(vars.file)}}" AS filename,
+            SAFE_CAST(dispatching_base_num AS STRING) AS dispatching_base_num,
+            SAFE_CAST(pickup_datetime AS TIMESTAMP) AS pickup_datetime,
+            SAFE_CAST(dropOff_datetime AS TIMESTAMP) AS dropOff_datetime,
+            SAFE_CAST(SR_Flag AS STRING) AS SR_Flag,
+            SAFE_CAST(PUlocationID AS STRING) AS PUlocationID,
+            SAFE_CAST(DOlocationID AS STRING) AS DOlocationID,
+            SAFE_CAST(Affiliated_base_number AS STRING) AS Affiliated_base_number
+          FROM `{{kv('GCP_PROJECT_ID')}}.{{render(vars.table)}}_ext`;
+
+      - id: bq_fhv_merge
+        type: io.kestra.plugin.gcp.bigquery.Query
+        sql: |
+          MERGE INTO `{{kv('GCP_PROJECT_ID')}}.{{kv('GCP_DATASET')}}.fhv_tripdata` T
+          USING `{{kv('GCP_PROJECT_ID')}}.{{render(vars.table)}}` S
+          ON T.unique_row_id = S.unique_row_id
+          WHEN NOT MATCHED THEN
+            INSERT (
+              unique_row_id, filename, dispatching_base_num,
+              pickup_datetime, dropOff_datetime,
+              SR_Flag, 
+              PUlocationID, DOlocationID, Affiliated_base_number
+            )
+            VALUES (
+              S.unique_row_id, S.filename, S.dispatching_base_num,
+              S.pickup_datetime, S.dropOff_datetime,
+              S.SR_Flag, 
+              S.PUlocationID, S.DOlocationID, S.Affiliated_base_number
+            );
 
   - id: purge_files
     type: io.kestra.plugin.core.storage.PurgeCurrentExecutionFiles
@@ -244,6 +320,12 @@ pluginDefaults:
       bucket: "{{kv('GCP_BUCKET_NAME')}}"
 
 triggers:
+  - id: fhv_schedule
+    type: io.kestra.plugin.core.trigger.Schedule
+    cron: "0 9 1 * *"
+    inputs:
+      taxi: fhv
+
   - id: green_schedule
     type: io.kestra.plugin.core.trigger.Schedule
     cron: "0 9 1 * *"
