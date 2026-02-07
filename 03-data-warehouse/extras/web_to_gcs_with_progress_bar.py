@@ -75,7 +75,7 @@ def csv_to_parquet_with_progress(
         "mta_tax": "float64",
         "tip_amount": "float64",
         "tolls_amount": "float64",
-        "ehailfee": "float64",  # only in green but ignored if missing column
+        "ehail_fee": "float64",  # only in green but ignored if missing column
         "improvement_surcharge": "float64",
         "total_amount": "float64",
         "congestion_surcharge": "float64",
