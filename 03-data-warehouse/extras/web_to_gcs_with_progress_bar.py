@@ -79,12 +79,20 @@ def csv_to_parquet_with_progress(
         "improvement_surcharge": "float64",
         "total_amount": "float64",
         "congestion_surcharge": "float64",
+        # FHV dataset columns (very different from green and yellow)
+        "dispatching_base_num": "string",
+        "PUlocationID": "Int64",
+        "DOlocationID": "Int64",
+        "SR_Flag": "string",
+        "Affiliated_base_number": "string",
     }
 
     if service_color == "yellow":
         parse_dates = ["tpep_pickup_datetime", "tpep_dropoff_datetime"]
-    else:
+    elif service_color == "green":
         parse_dates = ["lpep_pickup_datetime", "lpep_dropoff_datetime"]
+    else: # fhv
+        parse_dates = ["pickup_datetime", "dropOff_datetime"]
 
     reader = pd.read_csv(
         csv_path,
