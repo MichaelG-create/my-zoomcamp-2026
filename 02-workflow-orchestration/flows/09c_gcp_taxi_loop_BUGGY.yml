@@ -1,4 +1,4 @@
-id: 09_gcp_taxi_scheduled_BQ_part_only
+id: 09_gcp_taxi_LOOP_BQ_part_only
 namespace: zoomcamp
 description: |
   Best to add a label `backfill:true` from the UI to track executions created via a backfill.
